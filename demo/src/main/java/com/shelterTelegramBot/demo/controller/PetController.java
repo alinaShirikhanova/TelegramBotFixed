@@ -23,16 +23,16 @@ public class PetController{
         this.getPetService = getPetService;
     }
 
-    public void executePets(String callBackData, Long chatId) {
-        if (callBackData.equals(ButtonsNames.GET_PET_FROM_SHELTER_BUTTON_DATA)) {
-            getPetService.getPetFromShelterMenu(chatId, "Выберите пункт: ");
-        } else if (callBackData.contains("_PETS_BY_ID_")) {
-            Long petId = Long.parseLong(callBackData.split("_")[0]);
-            getPetService.setPetInfoMenu(chatId, "Что хотите узнать?", petId);
-        } else if (callBackData.contains("PET_INFO")) {
-            getPetService.getInfoByPetId(chatId, callBackData);
-        } else if (callBackData.contains("GETPET")) {
-            getPetService.getPetsOrRecommendationsMenu(chatId, callBackData);
-        }
-    }
+//    public void executePets(String callBackData, Long chatId) {
+//        if (callBackData.equals(ButtonsNames.GET_PET_FROM_SHELTER_BUTTON_DATA)) {
+//            getPetService.getPetFromShelterMenu(chatId, "Выберите пункт: ");
+//        } else if (callBackData.contains("_PETS_BY_ID_")) {
+//            Long petId = Long.parseLong(callBackData.split("_")[0]);
+//            getPetService.setPetInfoMenu(chatId, "Что хотите узнать?", petId);
+//        } else if (callBackData.contains("PET_INFO")) {
+//            getPetService.getInfoByPetId(chatId, callBackData);
+//        } else if (callBackData.contains("GETPET")) {
+//            getPetService.getPetsOrRecommendationsMenu(chatId, callBackData);
+//        }
+//    }
 }

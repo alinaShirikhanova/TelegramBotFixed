@@ -1,27 +1,29 @@
 package com.shelterTelegramBot.demo.controller;
 
-import com.shelterTelegramBot.demo.service.ShelterInfoService;
+import com.shelterTelegramBot.demo.service.ShelterService;
 import com.shelterTelegramBot.demo.utils.ButtonsNames;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 
 @Component
 public class ShelterController {
 
-    private final ShelterInfoService shelterInfoService;
+    private final ShelterService shelterInfoService;
 
-    public ShelterController(ShelterInfoService shelterInfoService) {
+    public ShelterController(ShelterService shelterInfoService) {
         this.shelterInfoService = shelterInfoService;
     }
 
-    public void executeCommand(String callBackData, Long chatId) {
-        if (callBackData.equals(ButtonsNames.INFO_ABOUT_SHELTER_BUTTON_DATA)) {
-            shelterInfoService.setSheltersMenuBot(chatId, "Приюты: ");
+    public SendMessage executeCommand(String callBackData) {
+        if (callBackData.equals(ButtonsNames.SHELTER_GROUP_INFO_ABOUT_SHELTER_BUTTON_DATA)) {
+            return shelterInfoService.setSheltersMenuBot();
         } else if (callBackData.contains("SHELTERS")) {
             Long shelterId = Long.parseLong(callBackData.split("_")[0]);
-            shelterInfoService.setShelterInfoMenu(chatId, "Что Вы хотите узнать?", shelterId);
-        } else if (callBackData.contains("INFO")) {
-            shelterInfoService.getInfoByShelterId(chatId, callBackData);
+            return shelterInfoService.setShelterInfoMenu(shelterId);
         }
+//        } else if (callBackData.contains("INFO")) {
+//            shelterInfoService.getInfoByShelterId(callBackData);
+//        }
+        return null;
     }
-
 }
