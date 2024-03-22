@@ -73,7 +73,8 @@ public class TelegramBotController extends TelegramLongPollingBot {
         } else if (update.hasCallbackQuery()) {
             String callBackData = update.getCallbackQuery().getData();
             chatId = update.getCallbackQuery().getMessage().getChatId();
-            if (callBackData.contains("SHELTER_GROUP")) {
+            if (callBackData.contains("SHELTER_GROUP"))
+            {
                 executeMessage(chatId, shelterInfoController.executeCommand(callBackData));
             }
 //            if (callBackData.contains("PET_GROUP")) {
