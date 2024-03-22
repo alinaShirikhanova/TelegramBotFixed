@@ -1,8 +1,6 @@
 package com.shelterTelegramBot.demo.controller;
 
 import com.shelterTelegramBot.demo.configuration.BotConfiguration;
-import com.shelterTelegramBot.demo.entity.PetEntity;
-import com.shelterTelegramBot.demo.entity.ShelterEntity;
 import com.shelterTelegramBot.demo.entity.UserEntity;
 import com.shelterTelegramBot.demo.repository.*;
 import com.shelterTelegramBot.demo.repository.PetRepository;
@@ -17,7 +15,6 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Component
 public class TelegramBotController extends TelegramLongPollingBot {
@@ -27,17 +24,23 @@ public class TelegramBotController extends TelegramLongPollingBot {
     private final PetRepository petRepository;
     private final RuleRepository ruleRepository;
 
+    private final PetController petController;
+
+    private final ShelterController shelterInfoController;
+
     public TelegramBotController(UserRepository userRepository,
-                       BotConfiguration configuration,
-                       ShelterRepository shelterRepository,
-                       PetRepository petRepository,
-                       RuleRepository ruleRepository) {
+                                 BotConfiguration configuration,
+                                 ShelterRepository shelterRepository,
+                                 PetRepository petRepository,
+                                 RuleRepository ruleRepository, PetController petController, ShelterController shelterInfoController) {
         super(configuration.getToken());
         this.userRepository = userRepository;
         this.configuration = configuration;
         this.shelterRepository = shelterRepository;
         this.petRepository = petRepository;
         this.ruleRepository = ruleRepository;
+        this.petController = petController;
+        this.shelterInfoController = shelterInfoController;
     }
 
     /**
@@ -61,152 +64,30 @@ public class TelegramBotController extends TelegramLongPollingBot {
             }
             setStarMenuBot(chatId, "Главное меню");
         } else if (update.hasCallbackQuery()) {
-            chatId = update.getCallbackQuery().getMessage().getChatId();
             String callBackData = update.getCallbackQuery().getData();
-            if (callBackData.equals(ButtonsNames.INFO_ABOUT_SHELTER_BUTTON_DATA)) {
-                setSheltersMenuBot(chatId, "Приюты: ");
-            } else if (callBackData.contains("SHELTERS")) {
-                Long shelterId = Long.parseLong(callBackData.split("_")[0]);
-                setShelterInfoMenu(chatId, "Что Вы хотите узнать?", shelterId);
-            } else if (callBackData.contains("INFO")) {
-                getInfoByShelterId(chatId, callBackData);
+            chatId = update.getCallbackQuery().getMessage().getChatId();
+            if (callBackData.contains("SHELTER_GROUP")) {
+                shelterInfoController.executeCommand(callBackData, chatId);
             }
-            if (callBackData.equals(ButtonsNames.GET_PET_FROM_SHELTER_BUTTON_DATA)) {
-                getPetFromShelterMenu(chatId, "Выберите пункт: ");
-//                getAllPetsMenu(chatId, "Наши питомцы");
-            } else if (callBackData.contains("_PETS_BY_ID_")) {
-                Long petId = Long.parseLong(callBackData.split("_")[0]);
-                setPetInfoMenu(chatId, "Что хотите узнать?", petId);
-            } else if (callBackData.contains("PET_INFO")) {
-                getInfoByPetId(chatId, callBackData);
-            } else if (callBackData.contains("GETPET")) {
-                getPetsOrRecommendationsMenu(chatId, callBackData);
-
+            if (callBackData.contains("PET_GROUP")) {
+                petController.executePets(callBackData, chatId);
             }
-
         }
     }
-
-    private void getPetsOrRecommendationsMenu(Long chatId, String callbackData) {
-        if (callbackData.equals(ButtonsNames.OUR_PETS_BUTTON_DATA)){
-            setAllPetsMenu(chatId, "Наши питомцы");
-        }
-        else {
-            setRecommendationsMenu(chatId, "Выберите рекоммендацию: ");
-        }
-    }
-
-    private void setRecommendationsMenu(Long chatId, String text) {
-        List<List<String>> lists = new ArrayList<>();
-        lists.add(List.of(ButtonsNames.RULES_DATING_PETS_BUTTON_NAME, ButtonsNames.RULES_DATING_PETS_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.DOCUMENTS_PETS_BUTTON_NAME, ButtonsNames.DOCUMENTS_PETS_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.REFUSAL_TO_ISSUE_ANIMAL_BUTTON_NAME, ButtonsNames.REFUSAL_TO_ISSUE_ANIMAL_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.TRANSPORTATION_RECOMMENDATIONS_BUTTON_NAME, ButtonsNames.TRANSPORTATION_RECOMMENDATIONS_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.RECOMMENDATION_HOUSE_BUTTON_NAME, ButtonsNames.RECOMMENDATION_HOUSE_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.RECOMMENDATIONS_DOG_HANDLER_BUTTON_NAME, ButtonsNames.RECOMMENDATIONS_DOG_HANDLER_BUTTON_DATA));
-        setKeyboard(chatId, text, lists, 1);
-    }
-
-
-    private void getPetFromShelterMenu(Long chatId, String text) {
-        List<List<String>> lists = new ArrayList<>();
-        lists.add(List.of(ButtonsNames.RECOMMENDATIONS_BUTTON_NAME, ButtonsNames.RECOMMENDATIONS_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.OUR_PETS_BUTTON_NAME, ButtonsNames.OUR_PETS_BUTTON_DATA));
-        setKeyboard(chatId, text, lists, 1);
-    }
-
     /**
-     * Меню отображения животных
+     * Метод создания стартового меню с кнопками
      *
      * @param chatId ID чата
-     * @param text   текст кнопок
+     * @param text   текст информации кнопок
      */
-    private void getPetMenu(Long chatId, String text) {
+    private void setStarMenuBot(Long chatId, String text) {
         List<List<String>> lists = new ArrayList<>();
-        lists.add(List.of(ButtonsNames.PET_NAME_BUTTON_NAME, ButtonsNames.PET_NAME_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.PET_AGE_BUTTON_NAME, ButtonsNames.PET_AGE_BUTTON_DATA));
-        setKeyboard(chatId, text, lists, 1);
-    }
-
-    /**
-     * Метод вывода всех животных приюта
-     * <br/>
-     * По циклу <b>информация из репозитория БД</b> {@link PetRepository} преобразуется в сущность {@link PetEntity}, где затем кладется в коллекцию {@link List}
-     * <br/>
-     * В цикле путем добавления из БД информации, создается меню <b>кнопок</b> {@code setKeyboard(chatId, text, lists, 2);}
-     *
-     * @param chatId ID чата
-     * @param text   текст кнопок с информацией о питомце
-     */
-    private void setAllPetsMenu(Long chatId, String text) {
-        List<List<String>> lists = new ArrayList<>();
-        for (PetEntity petEntity : petRepository.findAll()) {
-            lists.add(List.of(petEntity.getBreed() + " " + " возраст: " + petEntity.getAge() + " года ", petEntity.getId() + "_PETS_BY_ID_" + "BUTTON"));
-        }
+        lists.add(List.of(ButtonsNames.INFO_ABOUT_SHELTER_BUTTON_NAME, ButtonsNames.INFO_ABOUT_SHELTER_BUTTON_DATA));
+        lists.add(List.of(ButtonsNames.GET_PET_FROM_SHELTER_BUTTON_NAME, ButtonsNames.GET_PET_FROM_SHELTER_BUTTON_DATA));
+        lists.add(List.of(ButtonsNames.SEND_REPORT_PETS_BUTTON_NAME, ButtonsNames.SEND_REPORT_PETS_BUTTON_DATA));
+        lists.add(List.of(ButtonsNames.CALL_VOLUNTEER_BUTTON_NAME, ButtonsNames.CALL_VOLUNTEER_BUTTON_DATA));
         setKeyboard(chatId, text, lists, 2);
     }
-
-    /**
-     * Метод в котором информация о питомце ищется путем резделения строки и поиску по информации ID {@code Long petId = Long.parseLong(callBackData.split("_")[0])}
-     *
-     * @param chatId       ID чата
-     * @param callBackData аргумент (нажатая кнопка)
-     */
-    private void getInfoByPetId(Long chatId, String callBackData) {
-        Long petId = Long.parseLong(callBackData.split("_")[0]);
-//        System.out.println(petId.getClass().getName());
-        Optional<PetEntity> pet = petRepository.findById(petId);
-        if (pet.isPresent()) {
-            if (callBackData.contains(ButtonsNames.PET_NAME_BUTTON_DATA)) {
-                sendMessage(chatId, pet.get().getName());
-            } else if (callBackData.contains(ButtonsNames.PET_AGE_BUTTON_DATA)) {
-                sendMessage(chatId, String.valueOf(pet.get().getAge()));
-            } else if (callBackData.contains(ButtonsNames.PET_BREED_BUTTON_DATA)) {
-                sendMessage(chatId, pet.get().getBreed());
-            } else if (callBackData.contains(ButtonsNames.PET_COMMENT_BUTTON_DATA)) {
-                sendMessage(chatId, pet.get().getComment());
-            }
-        }
-    }
-
-    /**
-     * Метод создания кнопок
-     *
-     * @param chatId ID чата
-     * @param text   текст информации о питомце
-     * @param petId  ID питомца
-     */
-    private void setPetInfoMenu(Long chatId, String text, Long petId) {
-        List<List<String>> lists = new ArrayList<>();
-        lists.add(List.of(ButtonsNames.PET_NAME_BUTTON_NAME, petId + "_" + ButtonsNames.PET_NAME_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.PET_AGE_BUTTON_NAME, petId + "_" + ButtonsNames.PET_AGE_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.PET_BREED_BUTTON_NAME, petId + "_" + ButtonsNames.PET_BREED_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.PET_COMMENT_BUTTON_NAME, petId + "_" + ButtonsNames.PET_COMMENT_BUTTON_DATA));
-        setKeyboard(chatId, text, lists, 2);
-    }
-
-    /**
-     * Метод в котором информация о приюте ищется путем резделения строки и поиску по информации ID {@code Long petId = Long.parseLong(callBackData.split("_")[0])}
-     *
-     * @param chatId       ID чата
-     * @param callBackData аргумент (нажатая кнопка)
-     */
-    private void getInfoByShelterId(Long chatId, String callBackData) {
-        Long shelterId = Long.parseLong(callBackData.split("_")[0]);
-        Optional<ShelterEntity> shelter = shelterRepository.findById(shelterId);
-        if (shelter.isPresent()) {
-            if (callBackData.contains(ButtonsNames.SCHEDULE_BUTTON_DATA)) {
-                sendMessage(chatId, shelter.get().getSchedule());
-            } else if (callBackData.contains(ButtonsNames.DRIVING_DIRECTIONS_BUTTON_DATA)) {
-                sendMessage(chatId, shelter.get().getDrivingDirections());
-            } else if (callBackData.contains(ButtonsNames.GUARD_DETAILS_BUTTON_DATA)) {
-                sendMessage(chatId, shelter.get().getGuardDetails());
-            } else if (callBackData.contains(ButtonsNames.SAFETY_PRECAUTIONS_BUTTON_DATA)) {
-                sendMessage(chatId, shelter.get().getSafetyPrecautions());
-            }
-        }
-    }
-
     /**
      * Метод создания клавиатуры бота
      *
@@ -215,7 +96,7 @@ public class TelegramBotController extends TelegramLongPollingBot {
      * @param buttonsInfo  список кнопок
      * @param amountOfRows количество строк кнопок
      */
-    private void setKeyboard(Long chatId, String text, List<List<String>> buttonsInfo, int amountOfRows) {
+    public void setKeyboard(Long chatId, String text, List<List<String>> buttonsInfo, int amountOfRows) {
         //Создание кнопок
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(); //разметка кнопок
         List<List<InlineKeyboardButton>> rows = new ArrayList<>(); //список строк
@@ -236,56 +117,6 @@ public class TelegramBotController extends TelegramLongPollingBot {
         keyboard.setKeyboard(rows);
         sendMessageWithKeyboard(chatId, text, keyboard);
     }
-
-    /**
-     * Метод вывода всех животных приюта
-     * <br/>
-     * По циклу <b>информация из репозитория БД</b> {@link ShelterRepository} преобразуется в сущность {@link ShelterEntity}, где затем кладется в коллекцию {@link List}
-     * <br/>
-     * В цикле путем добавления из БД информации, создается меню <b>кнопок</b> {@code setKeyboard(chatId, text, lists, 1);}
-     *
-     * @param chatId
-     * @param text
-     */
-    private void setSheltersMenuBot(Long chatId, String text) {
-        List<List<String>> lists = new ArrayList<>();
-        for (ShelterEntity shelterEntity : shelterRepository.findAll()) {
-            lists.add(List.of(shelterEntity.getName(), shelterEntity.getId() + "_SHELTERS_" + "BUTTON"));
-        }
-        setKeyboard(chatId, text, lists, 1);
-    }
-
-    /**
-     * Метод создания кнопок
-     *
-     * @param chatId    ID чата
-     * @param text      текст информации о приюте
-     * @param shelterId ID приюта
-     */
-    private void setShelterInfoMenu(Long chatId, String text, Long shelterId) {
-        List<List<String>> lists = new ArrayList<>();
-        lists.add(List.of(ButtonsNames.SCHEDULE_BUTTON_NAME, shelterId + "_" + ButtonsNames.SCHEDULE_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.DRIVING_DIRECTIONS_BUTTON_NAME, shelterId + "_" + ButtonsNames.DRIVING_DIRECTIONS_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.GUARD_DETAILS_BUTTON_NAME, shelterId + "_" + ButtonsNames.GUARD_DETAILS_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.SAFETY_PRECAUTIONS_BUTTON_NAME, shelterId + "_" + ButtonsNames.SAFETY_PRECAUTIONS_BUTTON_DATA));
-        setKeyboard(chatId, text, lists, 2);
-    }
-
-    /**
-     * Метод создания стартового меню с кнопками
-     *
-     * @param chatId ID чата
-     * @param text   текст информации кнопок
-     */
-    private void setStarMenuBot(Long chatId, String text) {
-        List<List<String>> lists = new ArrayList<>();
-        lists.add(List.of(ButtonsNames.INFO_ABOUT_SHELTER_BUTTON_NAME, ButtonsNames.INFO_ABOUT_SHELTER_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.GET_PET_FROM_SHELTER_BUTTON_NAME, ButtonsNames.GET_PET_FROM_SHELTER_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.SEND_REPORT_PETS_BUTTON_NAME, ButtonsNames.SEND_REPORT_PETS_BUTTON_DATA));
-        lists.add(List.of(ButtonsNames.CALL_VOLUNTEER_BUTTON_NAME, ButtonsNames.CALL_VOLUNTEER_BUTTON_DATA));
-        setKeyboard(chatId, text, lists, 2);
-    }
-
     /**
      * Метод создания кливиатуры
      *
@@ -293,14 +124,12 @@ public class TelegramBotController extends TelegramLongPollingBot {
      * @param text   Текст кнопок
      * @param markup разметка кнопок
      */
-    private void sendMessageWithKeyboard(Long chatId, String text, InlineKeyboardMarkup markup) {
+    public void sendMessageWithKeyboard(Long chatId, String text, InlineKeyboardMarkup markup) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setReplyMarkup(markup);
         executeMessage(chatId, text, sendMessage);
     }
-
-
-    private void executeMessage(Long chatId, String text, SendMessage sendMessage) {
+    public void executeMessage(Long chatId, String text, SendMessage sendMessage) {
         sendMessage.setChatId(chatId);
         sendMessage.setText(text);
         try {
@@ -309,11 +138,9 @@ public class TelegramBotController extends TelegramLongPollingBot {
             throw new RuntimeException(e);
         }
     }
-
-    private void sendMessage(Long chatId, String text) {
+    public void sendMessage(Long chatId, String text) {
         executeMessage(chatId, text, new SendMessage());
     }
-
     @Override
     public String getBotUsername() {
         return configuration.getName();
