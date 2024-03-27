@@ -21,9 +21,9 @@ public class ShelterController {
             Long shelterId = Long.parseLong(callBackData.split("_")[0]);
             return shelterInfoService.setShelterInfoMenu(shelterId);
         }
-//        } else if (callBackData.contains("INFO")) {
-//            shelterInfoService.getInfoByShelterId(callBackData);
-//        }
+        else if (callBackData.contains("INFO")) {
+           return shelterInfoService.getInfoByShelterId(callBackData);
+        }
         return null;
     }
 }

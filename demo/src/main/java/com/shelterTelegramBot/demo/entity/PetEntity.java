@@ -15,6 +15,7 @@ import javax.persistence.*;
 @Table(schema = "public", name = "pets")
 public class PetEntity {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) //Генерация ID
     private Long id;

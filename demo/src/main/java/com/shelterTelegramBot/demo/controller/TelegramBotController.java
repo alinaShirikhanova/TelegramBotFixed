@@ -1,6 +1,7 @@
 package com.shelterTelegramBot.demo.controller;
 
 import com.shelterTelegramBot.demo.configuration.BotConfiguration;
+import com.shelterTelegramBot.demo.entity.PetEntity;
 import com.shelterTelegramBot.demo.entity.UserEntity;
 import com.shelterTelegramBot.demo.repository.*;
 import com.shelterTelegramBot.demo.repository.PetRepository;
@@ -55,36 +56,35 @@ public class TelegramBotController extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         Long chatId;
+        SendMessage sendMessage = new SendMessage();
         if (update.hasMessage() && update.getMessage().hasText()) {
             chatId = update.getMessage().getChatId();
             String name = update.getMessage().getChat().getFirstName();
             String text = update.getMessage().getText();
             UserEntity userEntity = new UserEntity().setChatId(chatId).setName(name);
-//            if (userRepository.findByChatId(chatId).isPresent()) {
-//                sendMessage(chatId, "И снова здравствуйте! " + userEntity.getName());
-//            } else {
-//                sendMessage(chatId, "Здравствуйте! " + userEntity.getName());
-//                userRepository.save(userEntity);
-//            }
-            SendMessage sendMessage = new SendMessage();
+            if (userRepository.findByChatId(chatId).isPresent()) {
+                sendMessage.setText("И снова здравствуйте " + userEntity.getName());
+            } else {
+                sendMessage.setText("Здравствуйте! " + userEntity.getName());
+                userRepository.save(userEntity);
+            }
             sendMessage.setReplyMarkup(setStarMenuBot());
             executeMessage(chatId, sendMessage);
 
         } else if (update.hasCallbackQuery()) {
             String callBackData = update.getCallbackQuery().getData();
             chatId = update.getCallbackQuery().getMessage().getChatId();
-            if (callBackData.contains("SHELTER_GROUP"))
-            {
+            if (callBackData.contains("SHELTER_GROUP")) {
                 executeMessage(chatId, shelterInfoController.executeCommand(callBackData));
             }
             if (callBackData.contains("PET_GROUP")) {
-                petController.executeCommand(callBackData);
+                executeMessage(chatId, petController.executeCommand(callBackData));
             }
         }
     }
+
     /**
      * Метод создания стартового меню с кнопками
-     *
      */
     //ПЕРЕНЕСТИ В СЕРВИС
     private InlineKeyboardMarkup setStarMenuBot() {
@@ -96,15 +96,15 @@ public class TelegramBotController extends TelegramLongPollingBot {
         return utilsService.setKeyboard(lists, 2);
     }
 
-    public void executeMessage(Long chatId,  SendMessage sendMessage) {
+    public void executeMessage(Long chatId, SendMessage sendMessage) {
         sendMessage.setChatId(chatId);
-        sendMessage.setText(" 23123");
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
             throw new RuntimeException(e);
         }
     }
+
     @Override
     public String getBotUsername() {
         return configuration.getName();

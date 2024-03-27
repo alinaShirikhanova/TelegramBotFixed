@@ -56,7 +56,7 @@ public class ShelterService {
     public SendMessage setSheltersMenuBot() {
         List<List<String>> lists = new ArrayList<>();
         for (ShelterEntity shelterEntity : shelterRepository.findAll()) {
-            lists.add(List.of(shelterEntity.getName(), shelterEntity.getId() + "_SHELTERS_" + "BUTTON"));
+            lists.add(List.of(shelterEntity.getName(), shelterEntity.getId() + "_SHELTERS_"+ "SHELTER_GROUP" + "BUTTON"));
         }
         SendMessage sendMessage = new SendMessage();
         sendMessage.setText("Приюты:");
@@ -80,7 +80,23 @@ public class ShelterService {
         sendMessage.setReplyMarkup(utilsService.setKeyboard(lists, 2));
         return sendMessage;
     }
-
+    public SendMessage getInfoByShelterId( String callBackData) {
+        Long shelterId = Long.parseLong(callBackData.split("_")[0]);
+        Optional<ShelterEntity> shelter = shelterRepository.findById(shelterId);
+        SendMessage sendMessage = new SendMessage();
+        if (shelter.isPresent()) {
+            if (callBackData.contains(ButtonsNames.SHELTER_GROUP_SCHEDULE_BUTTON_DATA)) {
+                sendMessage.setText(shelter.get().getSchedule());
+            } else if (callBackData.contains(ButtonsNames.SHELTER_GROUP_DRIVING_DIRECTIONS_BUTTON_DATA)) {
+                sendMessage.setText(shelter.get().getDrivingDirections());
+            } else if (callBackData.contains(ButtonsNames.SHELTER_GROUP_GUARD_DETAILS_BUTTON_DATA)) {
+                sendMessage.setText(shelter.get().getGuardDetails());
+            } else if (callBackData.contains(ButtonsNames.SHELTER_GROUP_SAFETY_PRECAUTIONS_BUTTON_DATA)) {
+                sendMessage.setText(shelter.get().getSafetyPrecautions());
+            }
+        }
+        return sendMessage;
+    }
 
 
 }
